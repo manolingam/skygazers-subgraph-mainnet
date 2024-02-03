@@ -1,106 +1,52 @@
-import {
-  Approval as ApprovalEvent,
-  ApprovalForAll as ApprovalForAllEvent,
-  RoleAdminChanged as RoleAdminChangedEvent,
-  RoleGranted as RoleGrantedEvent,
-  RoleRevoked as RoleRevokedEvent,
-  Transfer as TransferEvent
-} from "../generated/Contract/Contract"
-import {
-  Approval,
-  ApprovalForAll,
-  RoleAdminChanged,
-  RoleGranted,
-  RoleRevoked,
-  Transfer
-} from "../generated/schema"
+import { Transfer } from '../generated/Contract/Contract';
+import { SkyGazer, SkyGazerOwner } from '../generated/schema';
 
-export function handleApproval(event: ApprovalEvent): void {
-  let entity = new Approval(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.owner = event.params.owner
-  entity.approved = event.params.approved
-  entity.tokenId = event.params.tokenId
+const zeroAddress = '0x0000000000000000000000000000000000000000';
 
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
+export function handleMint(event: Transfer): void {
+  let skygazer = new SkyGazer(event.params.tokenId.toHex());
+  let skygazerMinter = SkyGazerOwner.load(event.params.to.toHex());
 
-  entity.save()
+  if (skygazerMinter == null) {
+    skygazerMinter = new SkyGazerOwner(event.params.to.toHex());
+  }
+
+  skygazerMinter.address = event.params.to;
+
+  skygazer.tokenId = event.params.tokenId;
+  skygazer.owner = skygazerMinter.id;
+  skygazer.tokenUri = `ipfs://QmP56v7jD7ozSPJi9L8xreW45YS2ZJe4uNgfJP14vout2U/${event.params.tokenId}.json`;
+
+  skygazerMinter.save();
+  skygazer.save();
 }
 
-export function handleApprovalForAll(event: ApprovalForAllEvent): void {
-  let entity = new ApprovalForAll(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.owner = event.params.owner
-  entity.operator = event.params.operator
-  entity.approved = event.params.approved
+export function handleSale(event: Transfer): void {
+  let skygazer = SkyGazer.load(event.params.tokenId.toHexString());
+  let presentSkyGazerOwner = SkyGazerOwner.load(event.params.to.toHexString());
 
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
+  if (presentSkyGazerOwner == null) {
+    presentSkyGazerOwner = new SkyGazerOwner(event.params.to.toHexString());
+    presentSkyGazerOwner.address = event.params.to;
+  }
 
-  entity.save()
+  if (skygazer == null) {
+    skygazer = new SkyGazer(event.params.tokenId.toHexString());
+  }
+
+  skygazer.owner = presentSkyGazerOwner.id;
+
+  presentSkyGazerOwner.save();
+  skygazer.save();
 }
 
-export function handleRoleAdminChanged(event: RoleAdminChangedEvent): void {
-  let entity = new RoleAdminChanged(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.role = event.params.role
-  entity.previousAdminRole = event.params.previousAdminRole
-  entity.newAdminRole = event.params.newAdminRole
+export function handleTransfer(event: Transfer): void {
+  let from = event.params.from.toHexString();
+  let to = event.params.to.toHexString();
 
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
-
-export function handleRoleGranted(event: RoleGrantedEvent): void {
-  let entity = new RoleGranted(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.role = event.params.role
-  entity.account = event.params.account
-  entity.sender = event.params.sender
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
-
-export function handleRoleRevoked(event: RoleRevokedEvent): void {
-  let entity = new RoleRevoked(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.role = event.params.role
-  entity.account = event.params.account
-  entity.sender = event.params.sender
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
-
-export function handleTransfer(event: TransferEvent): void {
-  let entity = new Transfer(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.from = event.params.from
-  entity.to = event.params.to
-  entity.tokenId = event.params.tokenId
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
+  if (from == zeroAddress && to != zeroAddress) {
+    handleMint(event);
+  } else if (from != zeroAddress && to != zeroAddress) {
+    handleSale(event);
+  }
 }
